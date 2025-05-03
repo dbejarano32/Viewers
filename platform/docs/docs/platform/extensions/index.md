@@ -1,6 +1,8 @@
 ---
 sidebar_position: 1
 sidebar_label: Introduction
+title: OHIF Extensions Introduction
+summary: Comprehensive introduction to the OHIF viewer extension system, explaining how extensions provide modular functionality through different module types, and how they're configured and accessed in modes to build customized viewer experiences.
 ---
 
 # Introduction
@@ -233,7 +235,7 @@ differently.
     <tr>
       <td align="left">
         <a href="./modules/layout-template">
-          LayoutTemplate (NEW)
+          LayoutTemplate
         </a>
       </td>
       <td align="left">Control Layout of a route</td>
@@ -241,7 +243,7 @@ differently.
     <tr>
       <td align="left">
         <a href="./modules/data-source">
-          DataSource (NEW)
+          DataSource
         </a>
       </td>
       <td align="left">Control the mapping from DICOM metadata to OHIF-metadata</td>

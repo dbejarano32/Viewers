@@ -53,11 +53,28 @@ function _getStudyInstanceUIDs() {
   return _model.studies.map(aStudy => aStudy.StudyInstanceUID);
 }
 
+/**
+ * Gets a study (a collection of series) using it's StudyInstanceUID
+ * @param {*} StudyInstanceUID - Unique Identifier for the study
+ * @returns {*} A study object
+ */
 function _getStudy(StudyInstanceUID) {
   return _model.studies.find(aStudy => aStudy.StudyInstanceUID === StudyInstanceUID);
 }
 
+/**
+ * Gets a series (a collection of images) using both
+ * the Study and Series InstanceUID's
+ * @param {*} StudyInstanceUID - Unique Identifier for the study
+ * @param {*} SeriesInstanceUID - Unique Identifier for the series
+ * @returns {*} A series object
+ */
 function _getSeries(StudyInstanceUID, SeriesInstanceUID) {
+  if(!StudyInstanceUID) {
+    const series = _model.studies.map(study => study.series).flat();
+    return series.find(aSeries => aSeries.SeriesInstanceUID === SeriesInstanceUID);
+  }
+
   const study = _getStudy(StudyInstanceUID);
 
   if (!study) {
@@ -67,6 +84,13 @@ function _getSeries(StudyInstanceUID, SeriesInstanceUID) {
   return study.series.find(aSeries => aSeries.SeriesInstanceUID === SeriesInstanceUID);
 }
 
+/**
+ * Gets an instance (a single image or object)
+ * @param {*} StudyInstanceUID - Unique Identifier for the study
+ * @param {*} SeriesInstanceUID - Unique Identifier for the series
+ * @param {*} SOPInstanceUID Unique Identifier for a specific instance
+ * @returns an instance object
+ */
 function _getInstance(StudyInstanceUID, SeriesInstanceUID, SOPInstanceUID) {
   const series = _getSeries(StudyInstanceUID, SeriesInstanceUID);
 
@@ -74,7 +98,7 @@ function _getInstance(StudyInstanceUID, SeriesInstanceUID, SOPInstanceUID) {
     return;
   }
 
-  return series.instances.find(instance => instance.SOPInstanceUID === SOPInstanceUID);
+  return series.getInstance(SOPInstanceUID);
 }
 
 function _getInstanceByImageId(imageId) {
@@ -186,7 +210,23 @@ const BaseImplementation = {
       madeInClient,
     });
   },
+  updateSeriesMetadata(seriesMetadata) {
+    const { StudyInstanceUID, SeriesInstanceUID } = seriesMetadata;
+    const series = _getSeries(StudyInstanceUID, SeriesInstanceUID);
+    if (!series) {
+      return;
+    }
+
+    const study = _getStudy(StudyInstanceUID);
+    if (study) {
+      study.setSeriesMetadata(SeriesInstanceUID, seriesMetadata);
+    }
+  },
   addSeriesMetadata(seriesSummaryMetadata, madeInClient = false) {
+    if (!seriesSummaryMetadata || !seriesSummaryMetadata.length || !seriesSummaryMetadata[0]) {
+      return;
+    }
+
     const { StudyInstanceUID } = seriesSummaryMetadata[0];
     let study = _getStudy(StudyInstanceUID);
     if (!study) {
@@ -210,6 +250,7 @@ const BaseImplementation = {
 
     this._broadcastEvent(EVENTS.SERIES_ADDED, {
       StudyInstanceUID,
+      seriesSummaryMetadata,
       madeInClient,
     });
   },

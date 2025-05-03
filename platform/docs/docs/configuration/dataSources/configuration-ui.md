@@ -1,6 +1,8 @@
 ---
 sidebar_position: 6
 sidebar_label: Configuration UI
+title: Configuration UI
+summary: Describes interfaces for implementing configurable data sources in OHIF, with details on BaseDataSourceConfigurationAPI and BaseDataSourceConfigurationAPIItem to enable generic UIs for hierarchical data source configuration.
 ---
 
 # Configuration UI
@@ -17,6 +19,11 @@ be made configurable via the generic UI as is depicted below for a
 Google Cloud Healthcare data source.
 
 ![Data source configuration UI](../../assets/img/data-source-configuration-ui.png)
+
+:::tip
+A datasource root URI can be [fully or partially specified](../../deployment/google-cloud-healthcare.md#configuring-google-cloud-healthcare-as-a-datasource-in-ohif)
+in the OHIF configuration file.
+:::
 
 ## `BaseDataSourceConfigurationAPIItem` interface
 
@@ -64,21 +71,21 @@ API, this would be `['Project', 'Location', 'Data set', 'DICOM store']`.
 
 Besides the configurable item labels themselves, several other string look ups
 are used base on EACH of the labels returned by this method.
-For instance, for the label `{itemLabel}``, the following strings are fetched for
+For instance, for the label `{itemLabel}`, the following strings are fetched for
 translation...
-1. `No {itemLabel} available`
+1. No `{itemLabel}` available
    - used to indicate no such items are available
-   - for example, for Google, `No Project available` would be 'No projects available'
-2. `Select {itemLabel}`
+   - for example, for Google, No Project available would be 'No projects available'
+2. Select `{itemLabel}`
    - used to direct selection of the item
-   - for example, for Google, `Select Project` would be 'Select a project'
-3. `Error fetching {itemLabel} list`
+   - for example, for Google, Select Project would be 'Select a project'
+3. Error fetching `{itemLabel}` list
    - used to indicate an error occurred fetching the list of items
    - usually accompanied by the error itself
-   - for example, for Google, `Error fetching Project list` would be 'Error fetching projects'
-4. `Search {itemLabel} list`
+   - for example, for Google, Error fetching Project list would be 'Error fetching projects'
+4. Search `{itemLabel}` list
    - used as the placeholder text for filtering a list of items
-   - for example, for Google, `Search Project list` would be 'Search projects'
+   - for example, for Google, Search Project list would be 'Search projects'
 
 #### `initialize`
 
@@ -112,7 +119,7 @@ with the labels returned from `getItemLabels`.
 ## Creation via Customization Module
 
 The generic UI (i.e. `DataSourceConfigurationComponent`) uses the
-[OHIF UI customization service](../../platform/services/ui/customization-service.md) to
+[OHIF UI customization service](../../platform/services/customization-service/customizationService.md) to
 instantiate the `BaseDataSourceConfigurationAPI` instance to configure a data source.
 
 A UI configurable data source should have a `configurationAPI` field as part of

@@ -1,6 +1,8 @@
 ---
 sidebar_position: 6
 sidebar_label: Panel
+title: Panel Module
+summary: Documentation for OHIF Panel Module, which provides UI components for the application's side panels, allowing extensions to contribute content that appears in left and right sidebars with proper event triggering and state management.
 ---
 
 # Module: Panel
@@ -107,7 +109,7 @@ function modeFactory({ modeConfiguration }) {
               rightPanels: [
                 '@ohif/extension-measurement-tracking.panelModule.trackedMeasurements',
               ],
-              rightPanelDefaultClosed: true,
+              rightPanelClosed: true,
               viewports,
             },
           };
@@ -147,5 +149,17 @@ const mode = {
 };
 
 export default mode;
+```
+
+:::note
+You can stack multiple panel components on top of each other by providing an array of panel components in the `rightPanels` or `leftPanels` properties.
+
+For instance we can use
 
 ```
+rightPanels: [[dicomSeg.panel, tracked.measurements], [dicomSeg.panel, tracked.measurements]]
+```
+
+This will result in two panels, one with `dicomSeg.panel` and `tracked.measurements` and the other with `dicomSeg.panel` and `tracked.measurements` stacked on top of each other.
+
+:::

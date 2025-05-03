@@ -1,5 +1,7 @@
 ---
 sidebar_position: 9
+title: Google Cloud Healthcare Integration
+summary: Guide to setting up Google Cloud Healthcare API as a DICOM data source for OHIF, including project creation, API configuration, OAuth authentication setup, and implementation details for connecting the viewer to Google-hosted medical imaging data.
 ---
 
 # Google Cloud Healthcare
@@ -128,3 +130,12 @@ cd OHIFViewer
 yarn install
 APP_CONFIG=config/google.js yarn run dev
 ```
+
+## Configuring Google Cloud Healthcare as a datasource in OHIF
+
+A Google Cloud Healthcare DICOM store can be configured as a DICOMweb datasource
+in OHIF. A full or partial path is permitted in the configuration file. For
+partial paths, the [data source configuration UI](../configuration/dataSources/configuration-ui.md)
+will assist in filling in the missing pieces. For example, a configuration with
+empty `wadoUriRoot`, `qidoRoot` and `wadoRoot` will prompt for the entire path
+step-by-step starting with the project.

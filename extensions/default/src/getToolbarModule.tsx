@@ -1,39 +1,55 @@
-import ToolbarDivider from './Toolbar/ToolbarDivider';
-import ToolbarLayoutSelectorWithServices from './Toolbar/ToolbarLayoutSelector';
-import ToolbarSplitButtonWithServices from './Toolbar/ToolbarSplitButtonWithServices';
-import ToolbarButtonWithServices from './Toolbar/ToolbarButtonWithServices';
+import { ToolButton, utils } from '@ohif/ui-next';
 
-export default function getToolbarModule({ commandsManager, servicesManager }) {
+import ToolbarLayoutSelectorWithServices from './Toolbar/ToolbarLayoutSelector';
+
+// legacy
+import ToolbarDividerLegacy from './Toolbar/ToolbarDivider';
+import ToolbarSplitButtonWithServicesLegacy from './Toolbar/ToolbarSplitButtonWithServices';
+import ToolbarButtonGroupWithServicesLegacy from './Toolbar/ToolbarButtonGroupWithServices';
+import { ProgressDropdownWithService } from './Components/ProgressDropdownWithService';
+
+// new
+import ToolButtonListWrapper from './Toolbar/ToolButtonListWrapper';
+import { ToolBoxButtonGroupWrapper, ToolBoxButtonWrapper } from './Toolbar/ToolBoxWrapper';
+
+export default function getToolbarModule({ commandsManager, servicesManager }: withAppTypes) {
+  const { cineService } = servicesManager.services;
   return [
+    // new
     {
-      name: 'ohif.divider',
-      defaultComponent: ToolbarDivider,
-      clickHandler: () => {},
+      name: 'ohif.toolButton',
+      defaultComponent: ToolButton,
     },
     {
-      name: 'ohif.action',
-      defaultComponent: ToolbarButtonWithServices,
-      clickHandler: () => {},
+      name: 'ohif.toolButtonList',
+      defaultComponent: ToolButtonListWrapper,
     },
     {
-      name: 'ohif.radioGroup',
-      defaultComponent: ToolbarButtonWithServices,
-      clickHandler: () => {},
+      name: 'ohif.toolBoxButtonGroup',
+      defaultComponent: ToolBoxButtonGroupWrapper,
     },
     {
-      name: 'ohif.splitButton',
-      defaultComponent: ToolbarSplitButtonWithServices,
-      clickHandler: () => {},
+      name: 'ohif.toolBoxButton',
+      defaultComponent: ToolBoxButtonWrapper,
     },
+    // others
     {
       name: 'ohif.layoutSelector',
-      defaultComponent: ToolbarLayoutSelectorWithServices,
-      clickHandler: (evt, clickedBtn, btnSectionName) => {},
+      defaultComponent: props =>
+        ToolbarLayoutSelectorWithServices({ ...props, commandsManager, servicesManager }),
     },
     {
-      name: 'ohif.toggle',
-      defaultComponent: ToolbarButtonWithServices,
-      clickHandler: () => {},
+      name: 'ohif.progressDropdown',
+      defaultComponent: ProgressDropdownWithService,
+    },
+    {
+      name: 'evaluate.cine',
+      evaluate: () => {
+        const isToggled = cineService.getState().isCineEnabled;
+        return {
+          className: utils.getToggledClassName(isToggled),
+        };
+      },
     },
   ];
 }

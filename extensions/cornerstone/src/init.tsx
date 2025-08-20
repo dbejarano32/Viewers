@@ -39,10 +39,7 @@ import { useLutPresentationStore } from './stores/useLutPresentationStore';
 import { usePositionPresentationStore } from './stores/usePositionPresentationStore';
 import { useSegmentationPresentationStore } from './stores/useSegmentationPresentationStore';
 import { imageRetrieveMetadataProvider } from '@cornerstonejs/core/utilities';
-import {
-  setupSegmentationDataModifiedHandler,
-  setupSegmentationModifiedHandler,
-} from './utils/segmentationHandlers';
+import { initializeWebWorkerProgressHandler } from './utils/initWebWorkerProgressHandler';
 
 const { registerColormap } = csUtilities.colormap;
 
@@ -96,7 +93,14 @@ export default async function init({
     viewportGridService,
     segmentationService,
     measurementService,
+    colorbarService,
+    displaySetService,
+    toolbarService,
   } = servicesManager.services;
+
+  toolbarService.registerEventForToolbarUpdate(colorbarService, [
+    colorbarService.EVENTS.STATE_CHANGED,
+  ]);
 
   window.services = servicesManager.services;
   window.extensionManager = extensionManager;
@@ -176,33 +180,21 @@ export default async function init({
   initWADOImageLoader(userAuthenticationService, appConfig, extensionManager);
 
   /* Measurement Service */
-  this.measurementServiceSource = connectToolsToMeasurementService(servicesManager);
+  this.measurementServiceSource = connectToolsToMeasurementService({
+    servicesManager,
+    commandsManager,
+    extensionManager,
+  });
 
   initCineService(servicesManager);
   initStudyPrefetcherService(servicesManager);
 
-  [
-    measurementService.EVENTS.JUMP_TO_MEASUREMENT_LAYOUT,
-    measurementService.EVENTS.JUMP_TO_MEASUREMENT_VIEWPORT,
-  ].forEach(event => {
-    measurementService.subscribe(event, evt => {
-      const { measurement } = evt;
-      const { uid: annotationUID } = measurement;
-      cornerstoneTools.annotation.selection.setAnnotationSelected(annotationUID, true);
-    });
+  measurementService.subscribe(measurementService.EVENTS.JUMP_TO_MEASUREMENT, evt => {
+    const { measurement } = evt;
+    const { uid: annotationUID } = measurement;
+    commandsManager.runCommand('jumpToMeasurementViewport', { measurement, annotationUID, evt });
   });
 
-  // Setup segmentation event handlers
-  const { unsubscribe: unsubscribeSegmentationDataModifiedHandler } =
-    setupSegmentationDataModifiedHandler({
-      segmentationService,
-      customizationService,
-      commandsManager,
-    });
-
-  const { unsubscribe: unsubscribeSegmentationModifiedHandler } = setupSegmentationModifiedHandler({
-    segmentationService,
-  });
 
   // When a custom image load is performed, update the relevant viewports
   hangingProtocolService.subscribe(
@@ -232,16 +224,6 @@ export default async function init({
     }
   );
 
-  // resize the cornerstone viewport service when the grid size changes
-  // IMPORTANT: this should happen outside of the OHIFCornerstoneViewport
-  // since it will trigger a rerender of each viewport and each resizing
-  // the offscreen canvas which would result in a performance hit, this should
-  // done only once per grid resize here. Doing it once here, allows us to reduce
-  // the refreshRage(in ms) to 10 from 50. I tried with even 1 or 5 ms it worked fine
-  viewportGridService.subscribe(viewportGridService.EVENTS.GRID_SIZE_CHANGED, () => {
-    cornerstoneViewportService.resize(true);
-  });
-
   initContextMenu({
     cornerstoneViewportService,
     customizationService,
@@ -265,8 +247,17 @@ export default async function init({
   eventTarget.addEventListener(EVENTS.IMAGE_LOAD_FAILED, imageLoadFailedHandler);
   eventTarget.addEventListener(EVENTS.IMAGE_LOAD_ERROR, imageLoadFailedHandler);
 
+  const getDisplaySetFromVolumeId = (volumeId: string) => {
+    const allDisplaySets = displaySetService.getActiveDisplaySets();
+    const volume = cornerstone.cache.getVolume(volumeId);
+    const imageIds = volume.imageIds;
+    return allDisplaySets.find(ds => ds.imageIds?.some(id => imageIds.includes(id)));
+  };
+
   function elementEnabledHandler(evt) {
     const { element } = evt.detail;
+    const { viewport } = getEnabledElement(element);
+    initViewTiming({ element });
 
     element.addEventListener(EVENTS.CAMERA_RESET, evt => {
       const { element } = evt.detail;
@@ -278,7 +269,10 @@ export default async function init({
       commandsManager.runCommand('resetCrosshairs', { viewportId });
     });
 
-    initViewTiming({ element });
+    // limitation: currently supporting only volume viewports with fusion
+    if (viewport.type !== cornerstone.Enums.ViewportType.ORTHOGRAPHIC) {
+      return;
+    }
   }
 
   eventTarget.addEventListener(EVENTS.ELEMENT_ENABLED, elementEnabledHandler.bind(null));
@@ -304,85 +298,10 @@ export default async function init({
     100
   );
 
+  // Subscribe to actor events to dynamically update colorbars
+
   // Call this function when initializing
   initializeWebWorkerProgressHandler(servicesManager.services.uiNotificationService);
-
-  const unsubscriptions = [
-    unsubscribeSegmentationDataModifiedHandler,
-    unsubscribeSegmentationModifiedHandler,
-  ];
-
-  return { unsubscriptions };
-}
-
-function initializeWebWorkerProgressHandler(uiNotificationService) {
-  // Use a single map to track all active worker tasks
-  const activeWorkerTasks = new Map();
-
-  // Create a normalized task key that doesn't include the random ID
-  // This helps us identify and deduplicate the same type of task
-  const getNormalizedTaskKey = type => {
-    return `worker-task-${type.toLowerCase().replace(/\s+/g, '-')}`;
-  };
-
-  eventTarget.addEventListener(EVENTS.WEB_WORKER_PROGRESS, ({ detail }) => {
-    const { progress, type, id } = detail;
-
-    // Skip notifications for compute statistics
-    if (type === cornerstoneTools.Enums.WorkerTypes.COMPUTE_STATISTICS) {
-      return;
-    }
-
-    const normalizedKey = getNormalizedTaskKey(type);
-
-    if (progress === 0) {
-      // Check if we're already tracking a task of this type
-      if (!activeWorkerTasks.has(normalizedKey)) {
-        const progressPromise = new Promise((resolve, reject) => {
-          activeWorkerTasks.set(normalizedKey, {
-            resolve,
-            reject,
-            originalId: id,
-            type,
-          });
-        });
-
-        uiNotificationService.show({
-          id: normalizedKey, // Use the normalized key as ID for better deduplication
-          title: `${type}`,
-          message: `Computing...`,
-          autoClose: false,
-          allowDuplicates: false,
-          deduplicationInterval: 60000, // 60 seconds - prevent frequent notifications of same type
-          promise: progressPromise,
-          promiseMessages: {
-            loading: `Computing...`,
-            success: `Completed successfully`,
-            error: 'Web Worker failed',
-          },
-        });
-      } else {
-        // Already tracking this type of task, just let it continue
-        console.debug(`Already tracking a "${type}" task, skipping duplicate notification`);
-      }
-    }
-    // Task completed
-    else if (progress === 100) {
-      // Check if we have this task type in our tracking map
-      const taskData = activeWorkerTasks.get(normalizedKey);
-
-      if (taskData) {
-        // Resolve the promise to update the notification
-        const { resolve } = taskData;
-        resolve({ progress, type });
-
-        // Remove from tracking
-        activeWorkerTasks.delete(normalizedKey);
-
-        console.debug(`Worker task "${type}" completed successfully`);
-      }
-    }
-  });
 }
 
 /**
